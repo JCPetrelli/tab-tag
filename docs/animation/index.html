@@ -1,0 +1,341 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>tab-tag in ten seconds</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #0d1016; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 100vh; }
+</style>
+<script type="importmap">
+  { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js" } }
+</script>
+</head>
+<body>
+<script type="module">
+import * as THREE from 'three'
+
+// Ten seconds, looped. Every frame is a pure function of the time `t`, so
+// render.mjs can ask for frame 0..299 and get the same film each run.
+const DURATION = 10
+const TABS = [
+  { prompt: 'fix the failing checkout tests', name: 'CHECKOUT TESTS', color: [231, 76, 60] },
+  { prompt: 'write the release notes for 2.4', name: 'RELEASE NOTES', color: [241, 196, 15] },
+  { prompt: 'why is the search page slow?', name: 'SEARCH SPEED', color: [46, 204, 113] },
+  { prompt: 'plan the database migration', name: 'DB MIGRATION', color: [52, 152, 219] },
+  { prompt: 'draft a blog post about caching', name: 'BLOG POST', color: [155, 89, 182] },
+]
+const DEFAULT_TITLE = '✳ Claude Code'
+const RENAME = { command: '/tab HOTFIX', name: 'HOTFIX', reply: 'Tab named HOTFIX.' }
+
+const BROWSE_AT = 0.5
+const BROWSE_STEP = 0.26
+const COLOR_AT = 2.0
+const COLOR_STAGGER = 0.15
+const COLOR_TIME = 0.5
+const NAME_AT = 3.2
+const NAME_STEP = 0.9
+const TYPE_TIME = 0.5
+const FLIP_TIME = 0.4
+const RENAME_AT = 7.8
+const RENAME_FLIP_AT = 8.4
+const CAPTIONS = [
+  { from: 0, text: 'Five Claude Code sessions. Which one is which?' },
+  { from: COLOR_AT, text: 'tab-tag gives every session its own colour' },
+  { from: NAME_AT, text: 'and names the tab from your first prompt' },
+  { from: 7.7, text: '/tab WORDS renames it by hand' },
+  { from: 9.0, text: 'tab-tag  ·  a Claude Code mod for iTerm2' },
+]
+
+const MONO = '"SF Mono", Menlo, Monaco, monospace'
+const SANS = '-apple-system, "Helvetica Neue", Helvetica, Arial, sans-serif'
+const TAB_WIDTH = 2.32
+const TAB_HEIGHT = 0.48
+const TAB_GAP = 0.06
+const TAB_Y = 2.65
+
+const clamp = value => Math.min(1, Math.max(0, value))
+const ease = value => (value < 0.5 ? 4 * value ** 3 : 1 - (-2 * value + 2) ** 3 / 2)
+const css = ([red, green, blue]) => `rgb(${red}, ${green}, ${blue})`
+const inkOn = ([red, green, blue]) =>
+  0.299 * red + 0.587 * green + 0.114 * blue > 150 ? '#14161b' : '#ffffff'
+
+function canvasTexture(width, height) {
+  const canvas = document.createElement('canvas')
+  canvas.width = width
+  canvas.height = height
+  const texture = new THREE.CanvasTexture(canvas)
+  texture.colorSpace = THREE.SRGBColorSpace
+  texture.anisotropy = 8
+
+  return { ctx: canvas.getContext('2d'), texture, width, height }
+}
+
+function plane(width, height, material) {
+  return new THREE.Mesh(new THREE.PlaneGeometry(width, height), material)
+}
+
+const flat = options => new THREE.MeshBasicMaterial({ toneMapped: false, ...options })
+
+function roundedShape(width, height, radius) {
+  const x = -width / 2
+  const y = -height / 2
+  const shape = new THREE.Shape()
+  shape.moveTo(x + radius, y)
+  shape.lineTo(x + width - radius, y)
+  shape.absarc(x + width - radius, y + radius, radius, -Math.PI / 2, 0)
+  shape.lineTo(x + width, y + height - radius)
+  shape.absarc(x + width - radius, y + height - radius, radius, 0, Math.PI / 2)
+  shape.lineTo(x + radius, y + height)
+  shape.absarc(x + radius, y + height - radius, radius, Math.PI / 2, Math.PI)
+  shape.lineTo(x, y + radius)
+  shape.absarc(x + radius, y + radius, radius, Math.PI, Math.PI * 1.5)
+
+  return new THREE.ShapeGeometry(shape, 12)
+}
+
+function tabTexture(text, background, ink) {
+  const { ctx, texture, width, height } = canvasTexture(928, 192)
+  ctx.fillStyle = background
+  ctx.beginPath()
+  ctx.roundRect(0, 0, width, height, 30)
+  ctx.fill()
+  ctx.fillStyle = ink
+  ctx.font = `600 74px ${MONO}`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillText(text, width / 2, height / 2 + 4)
+
+  return texture
+}
+
+function glowTexture() {
+  const { ctx, texture, width, height } = canvasTexture(256, 256)
+  const gradient = ctx.createRadialGradient(128, 128, 0, 128, 128, 128)
+  gradient.addColorStop(0, 'rgba(255, 255, 255, 1)')
+  gradient.addColorStop(1, 'rgba(255, 255, 255, 0)')
+  ctx.fillStyle = gradient
+  ctx.fillRect(0, 0, width, height)
+
+  return texture
+}
+
+// --- scene ---------------------------------------------------------------
+
+const renderer = new THREE.WebGLRenderer({ antialias: true })
+renderer.setClearColor('#0d1016')
+document.body.appendChild(renderer.domElement)
+const scene = new THREE.Scene()
+const camera = new THREE.PerspectiveCamera(40, 16 / 9, 0.1, 100)
+const glow = glowTexture()
+
+const backdrop = plane(26, 15, flat({ map: glow, transparent: true, opacity: 0.2, depthWrite: false }))
+backdrop.position.set(0, 0.4, -1)
+scene.add(backdrop)
+
+const frame = new THREE.Mesh(roundedShape(12.08, 6.28, 0.3), flat({ color: '#2b303b' }))
+frame.position.set(0, 0.4, -0.01)
+scene.add(frame)
+const pane = new THREE.Mesh(roundedShape(12, 6.2, 0.27), flat({ color: '#171a21' }))
+pane.position.set(0, 0.4, 0)
+scene.add(pane)
+const tabBar = plane(12, 0.6, flat({ color: '#101218' }))
+tabBar.position.set(0, TAB_Y, 0.01)
+scene.add(tabBar)
+
+for (const [index, color] of ['#ff5f57', '#febc2e', '#28c840'].entries()) {
+  const light = new THREE.Mesh(new THREE.CircleGeometry(0.09, 24), flat({ color }))
+  light.position.set(-5.6 + index * 0.3, 3.225, 0.02)
+  scene.add(light)
+}
+
+const tabs = TABS.map((tab, index) => {
+  const ink = inkOn(tab.color)
+  const group = new THREE.Group()
+  group.position.set(-5.92 + TAB_WIDTH / 2 + index * (TAB_WIDTH + TAB_GAP), TAB_Y, 0.1)
+  const plain = plane(TAB_WIDTH, TAB_HEIGHT, flat({ map: tabTexture(DEFAULT_TITLE, '#2b2f3a', '#9aa3b2'), transparent: true }))
+  plain.position.z = 0.02
+  const tintedTitle = tabTexture(DEFAULT_TITLE, css(tab.color), ink)
+  const tinted = plane(TAB_WIDTH, TAB_HEIGHT, flat({ map: tintedTitle, transparent: true, opacity: 0 }))
+  tinted.position.z = 0.03
+  tinted.renderOrder = 1
+  const named = plane(TAB_WIDTH, TAB_HEIGHT, flat({ map: tabTexture(tab.name, css(tab.color), ink), transparent: true }))
+  named.position.z = -0.03
+  named.rotation.x = Math.PI
+  const halo = plane(TAB_WIDTH * 1.9, TAB_HEIGHT * 5, flat({
+    map: glow, color: css(tab.color), transparent: true, opacity: 0, depthWrite: false, blending: THREE.AdditiveBlending,
+  }))
+  halo.position.set(group.position.x, TAB_Y, 0.05)
+  group.add(plain, tinted, named)
+  scene.add(group, halo)
+
+  return { group, tinted, tintedTitle, halo, color: new THREE.Color(css(tab.color)) }
+})
+const renamedTitle = tabTexture(RENAME.name, css(TABS[0].color), inkOn(TABS[0].color))
+
+const marker = plane(TAB_WIDTH - 0.3, 0.045, flat({ color: '#e8ecf3' }))
+scene.add(marker)
+
+const body = canvasTexture(1740, 705)
+const bodyPlane = plane(11.6, 4.7, flat({ map: body.texture, transparent: true }))
+bodyPlane.position.set(0, -0.175, 0.02)
+scene.add(bodyPlane)
+
+const caption = canvasTexture(2400, 150)
+const captionPlane = plane(12, 0.75, flat({ map: caption.texture, transparent: true }))
+captionPlane.position.set(0, -3.4, 0.02)
+scene.add(captionPlane)
+let shownCaption = -1
+
+// --- what is on screen at time t ------------------------------------------
+
+function activeTab(t) {
+  if (t >= RENAME_AT - 0.2) {
+    return 0
+  }
+
+  if (t >= NAME_AT) {
+    return Math.min(TABS.length - 1, Math.floor((t - NAME_AT) / NAME_STEP))
+  }
+
+  if (t >= COLOR_AT) {
+    return 0
+  }
+
+  return Math.floor(clamp((t - BROWSE_AT) / (BROWSE_STEP * TABS.length)) * (TABS.length - 0.001))
+}
+
+function promptText(t, active) {
+  if (t >= RENAME_AT) {
+    return RENAME.command.slice(0, Math.floor(clamp((t - RENAME_AT) / TYPE_TIME) * RENAME.command.length))
+  }
+
+  if (t < NAME_AT || t >= RENAME_AT - 0.2) {
+    return ''
+  }
+
+  const { prompt } = TABS[active]
+
+  return prompt.slice(0, Math.floor(clamp((t - NAME_AT - active * NAME_STEP) / TYPE_TIME) * prompt.length))
+}
+
+function drawBody(t, active) {
+  const { ctx, texture, width, height } = body
+  const text = promptText(t, active)
+  ctx.clearRect(0, 0, width, height)
+  ctx.textAlign = 'left'
+  ctx.textBaseline = 'alphabetic'
+  ctx.font = `600 44px ${MONO}`
+  ctx.fillStyle = '#d97757'
+  ctx.fillText('✳', 44, 96)
+  ctx.fillStyle = '#c9d0db'
+  ctx.fillText('Claude Code', 100, 96)
+  ctx.font = `400 34px ${MONO}`
+  ctx.fillStyle = '#5d6675'
+  ctx.fillText(`session ${active + 1} of ${TABS.length}`, 44, 150)
+
+  ctx.strokeStyle = '#3a4150'
+  ctx.lineWidth = 3
+  ctx.beginPath()
+  ctx.roundRect(44, 236, width - 88, 112, 18)
+  ctx.stroke()
+  ctx.font = `400 46px ${MONO}`
+  ctx.fillStyle = '#7d8696'
+  ctx.fillText('>', 76, 308)
+  ctx.fillStyle = '#eef1f6'
+  ctx.fillText(text, 128, 308)
+  const isTyping = text !== '' && text.length < (t >= RENAME_AT ? RENAME.command : TABS[active].prompt).length
+
+  if (isTyping || Math.floor(t * 2.5) % 2 === 0) {
+    ctx.fillRect(128 + ctx.measureText(text).width + 6, 268, 24, 50)
+  }
+
+  if (t >= RENAME_FLIP_AT + FLIP_TIME / 2) {
+    ctx.font = `400 38px ${MONO}`
+    ctx.fillStyle = '#7fd69b'
+    ctx.fillText(RENAME.reply, 76, 424)
+  }
+
+  texture.needsUpdate = true
+}
+
+function drawCaption(t) {
+  const index = CAPTIONS.findLastIndex(entry => t >= entry.from)
+  const until = CAPTIONS[index + 1]?.from ?? DURATION
+  captionPlane.material.opacity = Math.min(clamp((t - CAPTIONS[index].from) / 0.25), clamp((until - t) / 0.25))
+
+  if (index === shownCaption) {
+    return
+  }
+
+  shownCaption = index
+  const { ctx, texture, width, height } = caption
+  ctx.clearRect(0, 0, width, height)
+  ctx.font = `500 76px ${SANS}`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  ctx.fillStyle = '#dde2ea'
+  ctx.fillText(CAPTIONS[index].text, width / 2, height / 2)
+  texture.needsUpdate = true
+}
+
+function renderAt(time) {
+  const t = ((time % DURATION) + DURATION) % DURATION
+  const active = activeTab(t)
+
+  for (const [index, tab] of tabs.entries()) {
+    const tintStart = COLOR_AT + index * COLOR_STAGGER
+    const flipStart = NAME_AT + index * NAME_STEP + TYPE_TIME
+    const first = clamp((t - flipStart) / FLIP_TIME)
+    const second = index === 0 ? clamp((t - RENAME_FLIP_AT) / FLIP_TIME) : 0
+    const moving = first < 1 ? first : second
+    tab.tinted.material.opacity = ease(clamp((t - tintStart) / COLOR_TIME))
+    tab.tinted.material.map = index === 0 && t > RENAME_AT - 1 ? renamedTitle : tab.tintedTitle
+    tab.group.rotation.x = Math.PI * (ease(first) + ease(second))
+    tab.group.position.z = 0.1 + Math.sin(Math.PI * moving) * 0.7
+    tab.group.scale.setScalar(index === active ? 1.03 : 1)
+    tab.halo.material.opacity = Math.max(
+      Math.sin(Math.PI * moving) * 0.75,
+      Math.sin(Math.PI * clamp((t - tintStart) / (COLOR_TIME * 1.6))) * 0.5,
+    )
+  }
+
+  marker.position.set(tabs[active].group.position.x, TAB_Y - TAB_HEIGHT / 2 - 0.035, 0.09)
+  backdrop.material.color.set(t >= COLOR_AT + active * COLOR_STAGGER ? tabs[active].color : '#59606e')
+  drawBody(t, active)
+  drawCaption(t)
+
+  const swing = (t / DURATION) * Math.PI * 2
+  camera.position.set(Math.sin(swing) * 0.9, 0.3 + Math.sin(swing + 1) * 0.25, 11.6)
+  camera.lookAt(0, 0.1, 0)
+  renderer.render(scene, camera)
+}
+
+function resize() {
+  const width = window.innerWidth
+  const height = window.innerHeight
+  renderer.setPixelRatio(window.devicePixelRatio)
+  renderer.setSize(width, height, false)
+  camera.aspect = width / height
+  // Keep the whole window in view on screens narrower than 16:9.
+  camera.fov = 40 * Math.max(1, (16 / 9) / camera.aspect)
+  camera.updateProjectionMatrix()
+}
+
+resize()
+window.addEventListener('resize', resize)
+window.renderAt = renderAt
+
+if (new URLSearchParams(location.search).has('capture')) {
+  renderAt(0)
+} else {
+  const loop = now => {
+    renderAt(now / 1000)
+    requestAnimationFrame(loop)
+  }
+  requestAnimationFrame(loop)
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,12 @@
+{
+  "name": "tab-tag",
+  "owner": { "name": "Jacopo Castellano" },
+  "description": "tab-tag: a name and a colour for every Claude Code session's iTerm2 tab.",
+  "plugins": [
+    {
+      "name": "tab-tag",
+      "source": "./",
+      "description": "Names the iTerm2 tab with one or two uppercase words and gives each session's tab a random colour."
+    }
+  ]
+}

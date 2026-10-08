@@ -1,0 +1,7 @@
+{
+  "name": "tab-tag-animation",
+  "private": true,
+  "type": "module",
+  "scripts": { "render": "node render.mjs" },
+  "devDependencies": { "puppeteer-core": "^24.0.0" }
+}
