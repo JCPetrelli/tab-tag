@@ -6,8 +6,6 @@ A [Claude Code](https://claude.com/claude-code) mod that gives every session's [
 
 ![Five identical tabs get a colour each, then a name from the first prompt](docs/demo.gif)
 
-The same ten seconds as a video: [docs/demo.mp4](docs/demo.mp4).
-
 ## What it does
 
 | When | What happens to the tab |
