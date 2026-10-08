@@ -48,7 +48,7 @@ claude plugin marketplace remove tab-tag
 
 The name comes from one small model call per session: the first 1,500 characters of your first prompt go to the model, and the reply is limited to 16 tokens. The default model is `claude-haiku-4-5-20251001`.
 
-You can change the model in `/config`, in the row **Naming model**. If you empty that row, the mod makes no model call and uses the first two telling words of the prompt (`i want to find slow queries in the search page` gives `SLOW QUERIES`).
+You can change the model with `/plugin configure tab-tag@tab-tag`, option **Naming model**. If you leave that option empty, the mod makes no model call and uses the first two telling words of the prompt (`i want to find slow queries in the search page` gives `SLOW QUERIES`).
 
 The mod uses the same fallback when the model does not answer.
 
