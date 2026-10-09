@@ -1,6 +1,6 @@
 {
   "name": "tab-tag",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "author": { "name": "Jacopo Castellano" },
   "homepage": "https://github.com/JCPetrelli/tab-tag",
   "repository": "https://github.com/JCPetrelli/tab-tag",
@@ -13,7 +13,7 @@
       "type": "string",
       "title": "Naming model",
       "description": "The model that turns the first prompt into one or two words. Empty uses the prompt's own first words and makes no model call.",
-      "default": "claude-haiku-4-5-20251001"
+      "default": "claude-haiku-5-5"
     }
   }
 }
