@@ -44,6 +44,19 @@ claude plugin uninstall tab-tag@tab-tag
 claude plugin marketplace remove tab-tag
 ```
 
+## Codex
+
+The [`codex/`](codex) folder holds the same tool as a plugin for the [Codex CLI](https://github.com/openai/codex). It needs Node.js. It is new: the tests run the hook script, but not yet a full Codex session.
+
+```bash
+codex plugin marketplace add JCPetrelli/tab-tag
+codex plugin add tab-tag@tab-tag
+```
+
+Then start `codex` in iTerm2, run `/hooks` and trust the four tab-tag hooks. Codex does not run a plugin's hooks before you trust them.
+
+The Codex plugin makes no model call: the name is the first two telling words of your first prompt. A link to anywhere but GitHub leaves the name to the next prompt. There is no `/tab` command.
+
 ## The naming model
 
 The name comes from one small model call per session: the first 1,500 characters of your first prompt go to the model, and the reply is limited to 16 tokens. The default model is `claude-haiku-4-5-20251001`.
@@ -60,6 +73,7 @@ The mod uses the same fallback when the model does not answer.
 | [`hooks/words.ts`](hooks/words.ts) | The palette, and the rules that turn text into a title |
 | [`bin/tab.sh`](bin/tab.sh) | Writes iTerm2's escape sequences for tab title and tab colour to the session's terminal |
 | [`tests/tab.test.ts`](tests/tab.test.ts) | Tests for the title rules and for a full session |
+| [`codex/hooks/tab-tag.mjs`](codex/hooks/tab-tag.mjs) | The Codex plugin: one script for Codex's `SessionStart`, `UserPromptSubmit`, `Stop` and `SessionEnd` hooks |
 
 Two details:
 
@@ -81,6 +95,7 @@ git clone https://github.com/JCPetrelli/tab-tag
 cd tab-tag
 claude plugin validate .   # manifest and hooks, as the engine reads them
 claude plugin test .       # tests/*.test.ts
+node --test codex/tests/tab-tag.test.mjs   # the Codex plugin
 ```
 
 To try your copy in a session, add the folder as a marketplace (`claude plugin marketplace add ./tab-tag`) and install from it. After an edit, run `/reload-plugins` in the session.

@@ -1,0 +1,17 @@
+{
+  "name": "tab-tag",
+  "version": "0.1.0",
+  "description": "Names the iTerm2 tab with one or two uppercase words for what the session is about, and gives each session's tab a random colour.",
+  "author": { "name": "Jacopo Castellano", "url": "https://github.com/JCPetrelli" },
+  "homepage": "https://github.com/JCPetrelli/tab-tag",
+  "repository": "https://github.com/JCPetrelli/tab-tag",
+  "license": "MIT",
+  "keywords": ["iterm2", "terminal", "tabs", "hooks"],
+  "interface": {
+    "displayName": "tab-tag",
+    "shortDescription": "A name and a colour for every Codex session's iTerm2 tab",
+    "developerName": "Jacopo Castellano",
+    "category": "Productivity",
+    "websiteURL": "https://github.com/JCPetrelli/tab-tag"
+  }
+}

@@ -1,0 +1,12 @@
+{
+  "name": "tab-tag",
+  "interface": { "displayName": "tab-tag" },
+  "plugins": [
+    {
+      "name": "tab-tag",
+      "source": { "source": "local", "path": "./codex" },
+      "policy": { "installation": "AVAILABLE" },
+      "category": "Productivity"
+    }
+  ]
+}
