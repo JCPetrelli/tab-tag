@@ -13,6 +13,8 @@ A [Claude Code](https://claude.com/claude-code) mod that gives every session's [
 | A session starts | It gets a random colour from a palette of twelve, and the name of the folder you started in |
 | You send the first prompt | It is renamed to one or two uppercase words for what the prompt is about, for example `CHECKOUT TESTS` |
 | The first prompt is a slash command | The command's name becomes the tab name: `/release-notes` gives `RELEASE NOTES` |
+| The first prompt is a GitHub link and nothing else | The repository names the tab, with the issue or pull request number when there is room: `BRICKWISE 42` |
+| The first prompt is any other link and nothing else | The tab keeps the folder's name until the turn ends, then it is named from what Claude read behind the link |
 | You run `/tab HOTFIX` | The tab is named `HOTFIX` |
 | You run `/tab` with no words | The tab is named again from the last prompts of the conversation |
 | You resume a session | It gets back the colour and the name it had |

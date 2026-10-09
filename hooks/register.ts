@@ -2,11 +2,20 @@ import { atom, read, update } from 'claude-code'
 import type { EngineInterface, Register } from 'claude-code'
 
 import type { TabColor } from '../types'
-import { lastSegment, pickColor, titleFromCommand, titleFromWords, toTitle } from './words'
+import {
+  isLinkOnly,
+  lastSegment,
+  pickColor,
+  titleFromCommand,
+  titleFromLink,
+  titleFromWords,
+  toTitle,
+} from './words'
 
 const title = atom({ plugin: 'tab-tag', key: 'title' } as const, '')
 const color = atom({ plugin: 'tab-tag', key: 'color' } as const, null)
 const isNamed = atom({ plugin: 'tab-tag', key: 'isNamed' } as const, false)
+const isLinkWaiting = atom({ plugin: 'tab-tag', key: 'isLinkWaiting' } as const, false)
 
 const SYSTEM =
   'You label terminal tabs. Reply with ONE or TWO words, uppercase, naming the project or topic of the request. No punctuation, no explanation.'
@@ -60,7 +69,17 @@ async function rename($: EngineInterface, text: string) {
   await save($)
 }
 
-async function summarize($: EngineInterface, prompt: string, model: string) {
+// The last messages of the conversation, as text for a title.
+async function conversation($: EngineInterface, roles: readonly string[]) {
+  return (await $.session.messages())
+    .filter(message => roles.includes(message.role) && message.text !== '' && !message.text.startsWith('/'))
+    .slice(-6)
+    .map(message => message.text.slice(0, 300))
+    .join('\n')
+}
+
+// `words` is the text the fallback reads when no model answers.
+async function summarize($: EngineInterface, prompt: string, model: string, words = prompt) {
   let text = ''
 
   if (model !== '') {
@@ -73,7 +92,7 @@ async function summarize($: EngineInterface, prompt: string, model: string) {
     text = reply.isAnswered ? toTitle(reply.text) : ''
   }
 
-  await rename($, text === '' ? titleFromWords(prompt) : text)
+  await rename($, text === '' ? titleFromWords(words) : text)
 }
 
 export const register: Register = (on, options) => {
@@ -108,7 +127,13 @@ export const register: Register = (on, options) => {
     if (isPerson && !(await read($, isNamed))) {
       const fromCommand = titleFromCommand(e.text)
 
-      if (fromCommand === null) {
+      if (fromCommand === null && isLinkOnly(e.text)) {
+        // A link alone: GitHub's address names the repository. Any other link
+        // is named when the turn ends, from what Claude read behind it.
+        const fromLink = titleFromLink(e.text)
+        await update($, isLinkWaiting, () => fromLink === '')
+        await rename($, fromLink)
+      } else if (fromCommand === null) {
         $.clock.after(0, () => summarize($, e.text, model))
       } else {
         await rename($, fromCommand)
@@ -124,6 +149,11 @@ export const register: Register = (on, options) => {
     const done = await next(e)
 
     if (e.agentId === undefined) {
+      if ((await read($, isLinkWaiting)) && !(await read($, isNamed))) {
+        await summarize($, await conversation($, ['user', 'assistant']), model, await conversation($, ['user']))
+      }
+
+      await update($, isLinkWaiting, () => false)
       await paint($)
       $.clock.after(1500, () => paint($))
     }
@@ -140,12 +170,7 @@ export const register: Register = (on, options) => {
       return { text: `Tab named ${asked}.` }
     }
 
-    const prompts = (await $.session.messages())
-      .filter(message => message.role === 'user' && !message.text.startsWith('/'))
-      .slice(-6)
-      .map(message => message.text.slice(0, 300))
-      .join('\n')
-    await summarize($, prompts, model)
+    await summarize($, await conversation($, ['user']), model)
 
     return { text: `Tab named ${await read($, title)}.` }
   })
